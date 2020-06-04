@@ -1,0 +1,985 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>5.3 - Probability Density Transformation. &#8212; GemPy 2.2.1 documentation</title>
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/gallery.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/gallery-binder.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/gallery-dataframe.css" />
+    <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+    <script src="../../_static/jquery.js"></script>
+    <script src="../../_static/underscore.js"></script>
+    <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/language_data.js"></script>
+    <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Examples" href="../../examples/index.html" />
+    <link rel="prev" title="5 2 - Introduction PyMC3." href="ch5_2_introduction_pymc3.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="sphx-glr-download-link-note admonition note">
+<p class="admonition-title">Note</p>
+<p>Click <a class="reference internal" href="#sphx-glr-download-tutorials-ch5-probabilistic-modeling-ch5-3-probability-density-transformation-py"><span class="std std-ref">here</span></a>     to download the full example code</p>
+</div>
+<div class="sphx-glr-example-title section" id="probability-density-transformation">
+<span id="sphx-glr-tutorials-ch5-probabilistic-modeling-ch5-3-probability-density-transformation-py"></span><h1>5.3 - Probability Density Transformation.<a class="headerlink" href="#probability-density-transformation" title="Permalink to this headline">¶</a></h1>
+<div class="highlight-python3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Importing GemPy</span>
+<span class="kn">import</span> <span class="nn">gempy</span> <span class="k">as</span> <span class="nn">gp</span>
+<span class="kn">from</span> <span class="nn">examples.tutorials.ch5_probabilistic_modeling.aux_functions.aux_funct</span> <span class="kn">import</span> <span class="n">plot_geo_setting_well</span>
+<span class="kn">from</span> <span class="nn">gempy.bayesian</span> <span class="kn">import</span> <span class="n">plot_posterior</span> <span class="k">as</span> <span class="n">pp</span>
+<span class="kn">from</span> <span class="nn">gempy.bayesian.plot_posterior</span> <span class="kn">import</span> <a href="https://docs.python.org/3/library/stdtypes.html#str" title="builtins.str" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">default_red</span></a><span class="p">,</span> <a href="https://docs.python.org/3/library/stdtypes.html#list" title="builtins.list" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">default_blue</span></a>
+
+<span class="c1"># Importing auxiliary libraries</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">pymc3</span> <span class="k">as</span> <span class="nn">pm</span>
+<span class="kn">import</span> <span class="nn">arviz</span> <span class="k">as</span> <span class="nn">az</span>
+<span class="kn">import</span> <span class="nn">os</span>
+</pre></div>
+</div>
+<div class="section" id="model-definition">
+<h2>Model definition<a class="headerlink" href="#model-definition" title="Permalink to this headline">¶</a></h2>
+<p>Same problem as before, let’s assume the observations are layer
+thickness measurements taken on an outcrop. Now, in the previous example
+we chose a prior for the mean arbitrarily:
+<span class="math notranslate nohighlight">\(𝜇∼Normal(mu=10.0, sigma=5.0)\)</span>–something that made sense for these
+specific data set. If we do not have any further information, keeping
+an uninformative prior and let the data to dictate the final value of
+the inference is the sensible way forward. However, this also enable to
+add information to the system by setting informative priors.</p>
+<p>Imagine we get a borehole with the tops of the two interfaces of
+interest. Each of this data point will be a random variable itself since
+the accuracy of the exact 3D location will be always limited. Notice
+that this two data points refer to depth not to thickness–the unit of
+the rest of the observations. Therefore, the first step would be to
+perform a transformation of the parameters into the observations space.
+Naturally in this example a simple subtraction will suffice.</p>
+<p>Now we can define the probabilistic models:</p>
+<p>This is to make it work in sphinx gallery</p>
+<div class="highlight-python3 notranslate"><div class="highlight"><pre><span></span><a href="https://docs.python.org/3/library/stdtypes.html#str" title="builtins.str" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">cwd</span></a> <span class="o">=</span> <a href="https://docs.python.org/3/library/os.html#os.getcwd" title="os.getcwd" class="sphx-glr-backref-module-os sphx-glr-backref-type-py-function"><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span></a><span class="p">()</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="s1">&#39;examples&#39;</span> <span class="ow">in</span> <a href="https://docs.python.org/3/library/stdtypes.html#str" title="builtins.str" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">cwd</span></a><span class="p">:</span>
+    <a href="https://docs.python.org/3/library/stdtypes.html#str" title="builtins.str" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">path_dir</span></a> <span class="o">=</span> <a href="https://docs.python.org/3/library/os.html#os.getcwd" title="os.getcwd" class="sphx-glr-backref-module-os sphx-glr-backref-type-py-function"><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span></a><span class="p">()</span> <span class="o">+</span> <span class="s1">&#39;/examples/tutorials/ch5_probabilistic_modeling&#39;</span>
+<span class="k">else</span><span class="p">:</span>
+    <a href="https://docs.python.org/3/library/stdtypes.html#str" title="builtins.str" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">path_dir</span></a> <span class="o">=</span> <a href="https://docs.python.org/3/library/stdtypes.html#str" title="builtins.str" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">cwd</span></a>
+</pre></div>
+</div>
+<div class="highlight-python3 notranslate"><div class="highlight"><pre><span></span><a href="../../Model/gempy.core.model.Project.html#gempy.core.model.Project" title="gempy.core.model.Project" class="sphx-glr-backref-module-gempy-core-model sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">geo_model</span></a> <span class="o">=</span> <span class="n">gp</span><span class="o">.</span><span class="n">load_model</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;2-layers&#39;</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><a href="https://docs.python.org/3/library/stdtypes.html#str" title="builtins.str" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">path_dir</span></a><span class="p">,</span> <span class="n">recompile</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">plot_geo_setting_well</span><span class="p">(</span><a href="../../Model/gempy.core.model.Project.html#gempy.core.model.Project" title="gempy.core.model.Project" class="sphx-glr-backref-module-gempy-core-model sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">geo_model</span></a><span class="o">=</span><a href="../../Model/gempy.core.model.Project.html#gempy.core.model.Project" title="gempy.core.model.Project" class="sphx-glr-backref-module-gempy-core-model sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">geo_model</span></a><span class="p">)</span>
+</pre></div>
+</div>
+<img alt="Cell Number: mid Direction: y" class="sphx-glr-single-img" src="../../_images/sphx_glr_ch5_3_probability_density_transformation_001.png" />
+<p class="sphx-glr-script-out">Out:</p>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Active grids: [&#39;regular&#39;]
+Active grids: [&#39;regular&#39; &#39;topography&#39;]
+Setting kriging parameters to their default values.
+Compiling theano function...
+Level of Optimization:  fast_compile
+Device:  cpu
+Precision:  float64
+Number of faults:  0
+Compilation Done!
+Kriging values:
+                   values
+range            1.3e+04
+$C_o$            4.2e+06
+drift equations      [3]
+</pre></div>
+</div>
+<div class="highlight-python3 notranslate"><div class="highlight"><pre><span></span><a href="https://docs.python.org/3/library/stdtypes.html#list" title="builtins.list" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">y_obs</span></a> <span class="o">=</span> <span class="p">[</span><span class="mf">2.12</span><span class="p">]</span>
+<a href="https://docs.python.org/3/library/stdtypes.html#list" title="builtins.list" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">y_obs_list</span></a> <span class="o">=</span> <span class="p">[</span><span class="mf">2.12</span><span class="p">,</span> <span class="mf">2.06</span><span class="p">,</span> <span class="mf">2.08</span><span class="p">,</span> <span class="mf">2.05</span><span class="p">,</span> <span class="mf">2.08</span><span class="p">,</span> <span class="mf">2.09</span><span class="p">,</span>
+              <span class="mf">2.19</span><span class="p">,</span> <span class="mf">2.07</span><span class="p">,</span> <span class="mf">2.16</span><span class="p">,</span> <span class="mf">2.11</span><span class="p">,</span> <span class="mf">2.13</span><span class="p">,</span> <span class="mf">1.92</span><span class="p">]</span>
+
+<a href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.seed.html#numpy.random.seed" title="numpy.random.seed" class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span></a><span class="p">(</span><span class="mi">4003</span><span class="p">)</span>
+</pre></div>
+</div>
+<p># .. image:: /../../_static/computational_graph1.png</p>
+<div class="highlight-python3 notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">pm</span><span class="o">.</span><span class="n">Model</span><span class="p">()</span> <span class="k">as</span> <span class="n">model</span><span class="p">:</span>
+    <span class="n">mu_top</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="s1">&#39;$\mu_</span><span class="si">{top}</span><span class="s1">$&#39;</span><span class="p">,</span> <span class="mf">3.05</span><span class="p">,</span> <span class="o">.</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">sigma_top</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Gamma</span><span class="p">(</span><span class="s1">&#39;$\sigma_</span><span class="si">{top}</span><span class="s1">$&#39;</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="n">y_top</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="s1">&#39;y_</span><span class="si">{top}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">mu</span><span class="o">=</span><span class="n">mu_top</span><span class="p">,</span> <span class="n">sd</span><span class="o">=</span><span class="n">sigma_top</span><span class="p">,</span> <span class="n">observed</span><span class="o">=</span><span class="p">[</span><span class="mf">3.02</span><span class="p">])</span>
+
+    <span class="n">mu_bottom</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="s1">&#39;$\mu_</span><span class="si">{bottom}</span><span class="s1">$&#39;</span><span class="p">,</span> <span class="mf">1.02</span><span class="p">,</span> <span class="o">.</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">sigma_bottom</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Gamma</span><span class="p">(</span><span class="s1">&#39;$\sigma_</span><span class="si">{bottom}</span><span class="s1">$&#39;</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="n">y_bottom</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="s1">&#39;y_</span><span class="si">{bottom}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">mu</span><span class="o">=</span><span class="n">mu_bottom</span><span class="p">,</span> <span class="n">sd</span><span class="o">=</span><span class="n">sigma_bottom</span><span class="p">,</span> <span class="n">observed</span><span class="o">=</span><span class="p">[</span><span class="mf">1.02</span><span class="p">])</span>
+
+    <span class="n">mu_t</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Deterministic</span><span class="p">(</span><span class="s1">&#39;$\mu_</span><span class="si">{thickness}</span><span class="s1">$&#39;</span><span class="p">,</span> <span class="n">mu_top</span> <span class="o">-</span> <span class="n">mu_bottom</span><span class="p">)</span>
+    <span class="n">sigma_thick</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Gamma</span><span class="p">(</span><span class="s1">&#39;$\sigma_</span><span class="si">{thickness}</span><span class="s1">$&#39;</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="s1">&#39;y_</span><span class="si">{thickness}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">mu</span><span class="o">=</span><span class="n">mu_t</span><span class="p">,</span> <span class="n">sd</span><span class="o">=</span><span class="n">sigma_thick</span><span class="p">,</span> <span class="n">observed</span><span class="o">=</span><a href="https://docs.python.org/3/library/stdtypes.html#list" title="builtins.list" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">y_obs_list</span></a><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="sampling">
+<h2>Sampling<a class="headerlink" href="#sampling" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-python3 notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">model</span><span class="p">:</span>
+    <a href="https://docs.python.org/3/library/stdtypes.html#dict" title="builtins.dict" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">prior</span></a> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">sample_prior_predictive</span><span class="p">(</span><span class="mi">1000</span><span class="p">)</span>
+    <span class="n">trace</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="n">discard_tuned_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">cores</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <a href="https://docs.python.org/3/library/stdtypes.html#dict" title="builtins.dict" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">post</span></a> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">sample_posterior_predictive</span><span class="p">(</span><span class="n">trace</span><span class="p">)</span>
+</pre></div>
+</div>
+<p class="sphx-glr-script-out">Out:</p>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Sampling chain 0, 0 divergences:   0%|          | 0/1500 [00:00&lt;?, ?it/s]
+Sampling chain 0, 0 divergences:   1%|          | 12/1500 [00:00&lt;00:14, 102.84it/s]
+Sampling chain 0, 0 divergences:   1%|1         | 16/1500 [00:00&lt;00:27, 54.60it/s]
+Sampling chain 0, 0 divergences:   1%|1         | 22/1500 [00:00&lt;00:27, 54.27it/s]
+Sampling chain 0, 0 divergences:   2%|1         | 26/1500 [00:00&lt;00:37, 39.81it/s]
+Sampling chain 0, 0 divergences:   2%|2         | 31/1500 [00:00&lt;00:36, 39.86it/s]
+Sampling chain 0, 0 divergences:   2%|2         | 37/1500 [00:00&lt;00:33, 44.19it/s]
+Sampling chain 0, 0 divergences:   3%|2         | 42/1500 [00:00&lt;00:38, 37.51it/s]
+Sampling chain 0, 0 divergences:   3%|3         | 52/1500 [00:01&lt;00:32, 45.08it/s]
+Sampling chain 0, 0 divergences:   4%|3         | 58/1500 [00:01&lt;00:31, 46.49it/s]
+Sampling chain 0, 0 divergences:   4%|4         | 64/1500 [00:01&lt;00:31, 46.02it/s]
+Sampling chain 0, 0 divergences:   5%|4         | 71/1500 [00:01&lt;00:28, 49.38it/s]
+Sampling chain 0, 0 divergences:   5%|5         | 77/1500 [00:01&lt;00:33, 42.19it/s]
+Sampling chain 0, 0 divergences:   6%|5         | 85/1500 [00:01&lt;00:29, 47.50it/s]
+Sampling chain 0, 0 divergences:   6%|6         | 92/1500 [00:01&lt;00:26, 52.52it/s]
+Sampling chain 0, 0 divergences:   7%|6         | 99/1500 [00:01&lt;00:25, 55.08it/s]
+Sampling chain 0, 0 divergences:   7%|7         | 105/1500 [00:02&lt;00:25, 54.82it/s]
+Sampling chain 0, 0 divergences:   8%|7         | 113/1500 [00:02&lt;00:23, 59.53it/s]
+Sampling chain 0, 0 divergences:   9%|8         | 131/1500 [00:02&lt;00:18, 74.32it/s]
+Sampling chain 0, 0 divergences:  10%|#         | 151/1500 [00:02&lt;00:14, 91.27it/s]
+Sampling chain 0, 0 divergences:  11%|#1        | 165/1500 [00:02&lt;00:13, 101.72it/s]
+Sampling chain 0, 0 divergences:  12%|#1        | 179/1500 [00:02&lt;00:12, 109.93it/s]
+Sampling chain 0, 0 divergences:  13%|#2        | 194/1500 [00:02&lt;00:11, 117.70it/s]
+Sampling chain 0, 0 divergences:  15%|#4        | 219/1500 [00:02&lt;00:09, 139.43it/s]
+Sampling chain 0, 0 divergences:  17%|#6        | 248/1500 [00:02&lt;00:07, 165.00it/s]
+Sampling chain 0, 0 divergences:  18%|#8        | 271/1500 [00:03&lt;00:07, 175.02it/s]
+Sampling chain 0, 0 divergences:  20%|#9        | 296/1500 [00:03&lt;00:06, 191.80it/s]
+Sampling chain 0, 0 divergences:  22%|##1       | 329/1500 [00:03&lt;00:05, 218.63it/s]
+Sampling chain 0, 0 divergences:  24%|##3       | 358/1500 [00:03&lt;00:04, 235.55it/s]
+Sampling chain 0, 0 divergences:  26%|##5       | 385/1500 [00:03&lt;00:04, 244.41it/s]
+Sampling chain 0, 0 divergences:  28%|##7       | 415/1500 [00:03&lt;00:04, 258.24it/s]
+Sampling chain 0, 0 divergences:  30%|##9       | 447/1500 [00:03&lt;00:03, 273.28it/s]
+Sampling chain 0, 0 divergences:  32%|###1      | 476/1500 [00:03&lt;00:04, 246.13it/s]
+Sampling chain 0, 0 divergences:  34%|###3      | 503/1500 [00:03&lt;00:04, 213.97it/s]
+Sampling chain 0, 0 divergences:  35%|###5      | 527/1500 [00:04&lt;00:04, 216.40it/s]
+Sampling chain 0, 0 divergences:  37%|###6      | 554/1500 [00:04&lt;00:04, 229.96it/s]
+Sampling chain 0, 1 divergences:  37%|###6      | 554/1500 [00:04&lt;00:04, 229.96it/s]
+Sampling chain 0, 2 divergences:  37%|###6      | 554/1500 [00:04&lt;00:04, 229.96it/s]
+Sampling chain 0, 3 divergences:  37%|###6      | 554/1500 [00:04&lt;00:04, 229.96it/s]
+Sampling chain 0, 4 divergences:  37%|###6      | 554/1500 [00:04&lt;00:04, 229.96it/s]
+Sampling chain 0, 4 divergences:  39%|###9      | 586/1500 [00:04&lt;00:03, 250.47it/s]
+Sampling chain 0, 5 divergences:  39%|###9      | 586/1500 [00:04&lt;00:03, 250.47it/s]
+Sampling chain 0, 6 divergences:  39%|###9      | 586/1500 [00:04&lt;00:03, 250.47it/s]
+Sampling chain 0, 7 divergences:  39%|###9      | 586/1500 [00:04&lt;00:03, 250.47it/s]
+Sampling chain 0, 8 divergences:  39%|###9      | 586/1500 [00:04&lt;00:03, 250.47it/s]
+Sampling chain 0, 9 divergences:  39%|###9      | 586/1500 [00:04&lt;00:03, 250.47it/s]
+Sampling chain 0, 10 divergences:  39%|###9      | 586/1500 [00:04&lt;00:03, 250.47it/s]
+Sampling chain 0, 11 divergences:  39%|###9      | 586/1500 [00:04&lt;00:03, 250.47it/s]
+Sampling chain 0, 12 divergences:  39%|###9      | 586/1500 [00:04&lt;00:03, 250.47it/s]
+Sampling chain 0, 12 divergences:  42%|####2     | 631/1500 [00:04&lt;00:03, 287.25it/s]
+Sampling chain 0, 13 divergences:  42%|####2     | 631/1500 [00:04&lt;00:03, 287.25it/s]
+Sampling chain 0, 14 divergences:  42%|####2     | 631/1500 [00:04&lt;00:03, 287.25it/s]
+Sampling chain 0, 14 divergences:  44%|####4     | 664/1500 [00:04&lt;00:02, 295.87it/s]
+Sampling chain 0, 15 divergences:  44%|####4     | 664/1500 [00:04&lt;00:02, 295.87it/s]
+Sampling chain 0, 16 divergences:  44%|####4     | 664/1500 [00:04&lt;00:02, 295.87it/s]
+Sampling chain 0, 17 divergences:  44%|####4     | 664/1500 [00:04&lt;00:02, 295.87it/s]
+Sampling chain 0, 18 divergences:  44%|####4     | 664/1500 [00:04&lt;00:02, 295.87it/s]
+Sampling chain 0, 19 divergences:  44%|####4     | 664/1500 [00:04&lt;00:02, 295.87it/s]
+Sampling chain 0, 20 divergences:  44%|####4     | 664/1500 [00:04&lt;00:02, 295.87it/s]
+Sampling chain 0, 20 divergences:  46%|####6     | 696/1500 [00:04&lt;00:02, 284.68it/s]
+Sampling chain 0, 21 divergences:  46%|####6     | 696/1500 [00:04&lt;00:02, 284.68it/s]
+Sampling chain 0, 22 divergences:  46%|####6     | 696/1500 [00:04&lt;00:02, 284.68it/s]
+Sampling chain 0, 22 divergences:  48%|####8     | 726/1500 [00:04&lt;00:02, 270.67it/s]
+Sampling chain 0, 23 divergences:  48%|####8     | 726/1500 [00:04&lt;00:02, 270.67it/s]
+Sampling chain 0, 23 divergences:  50%|#####     | 755/1500 [00:04&lt;00:02, 273.30it/s]
+Sampling chain 0, 24 divergences:  50%|#####     | 755/1500 [00:04&lt;00:02, 273.30it/s]
+Sampling chain 0, 25 divergences:  50%|#####     | 755/1500 [00:04&lt;00:02, 273.30it/s]
+Sampling chain 0, 26 divergences:  50%|#####     | 755/1500 [00:04&lt;00:02, 273.30it/s]
+Sampling chain 0, 27 divergences:  50%|#####     | 755/1500 [00:04&lt;00:02, 273.30it/s]
+Sampling chain 0, 28 divergences:  50%|#####     | 755/1500 [00:04&lt;00:02, 273.30it/s]
+Sampling chain 0, 29 divergences:  50%|#####     | 755/1500 [00:04&lt;00:02, 273.30it/s]
+Sampling chain 0, 30 divergences:  50%|#####     | 755/1500 [00:04&lt;00:02, 273.30it/s]
+Sampling chain 0, 31 divergences:  50%|#####     | 755/1500 [00:04&lt;00:02, 273.30it/s]
+Sampling chain 0, 32 divergences:  50%|#####     | 755/1500 [00:04&lt;00:02, 273.30it/s]
+Sampling chain 0, 33 divergences:  50%|#####     | 755/1500 [00:04&lt;00:02, 273.30it/s]
+Sampling chain 0, 34 divergences:  50%|#####     | 755/1500 [00:04&lt;00:02, 273.30it/s]
+Sampling chain 0, 35 divergences:  50%|#####     | 755/1500 [00:04&lt;00:02, 273.30it/s]
+Sampling chain 0, 36 divergences:  50%|#####     | 755/1500 [00:04&lt;00:02, 273.30it/s]
+Sampling chain 0, 37 divergences:  50%|#####     | 755/1500 [00:04&lt;00:02, 273.30it/s]
+Sampling chain 0, 38 divergences:  50%|#####     | 755/1500 [00:04&lt;00:02, 273.30it/s]
+Sampling chain 0, 39 divergences:  50%|#####     | 755/1500 [00:04&lt;00:02, 273.30it/s]
+Sampling chain 0, 40 divergences:  50%|#####     | 755/1500 [00:04&lt;00:02, 273.30it/s]
+Sampling chain 0, 41 divergences:  50%|#####     | 755/1500 [00:04&lt;00:02, 273.30it/s]
+Sampling chain 0, 42 divergences:  50%|#####     | 755/1500 [00:04&lt;00:02, 273.30it/s]
+Sampling chain 0, 43 divergences:  50%|#####     | 755/1500 [00:04&lt;00:02, 273.30it/s]
+Sampling chain 0, 44 divergences:  50%|#####     | 755/1500 [00:04&lt;00:02, 273.30it/s]
+Sampling chain 0, 44 divergences:  53%|#####3    | 799/1500 [00:04&lt;00:02, 307.76it/s]
+Sampling chain 0, 45 divergences:  53%|#####3    | 799/1500 [00:04&lt;00:02, 307.76it/s]
+Sampling chain 0, 46 divergences:  53%|#####3    | 799/1500 [00:04&lt;00:02, 307.76it/s]
+Sampling chain 0, 47 divergences:  53%|#####3    | 799/1500 [00:04&lt;00:02, 307.76it/s]
+Sampling chain 0, 48 divergences:  53%|#####3    | 799/1500 [00:04&lt;00:02, 307.76it/s]
+Sampling chain 0, 49 divergences:  53%|#####3    | 799/1500 [00:04&lt;00:02, 307.76it/s]
+Sampling chain 0, 50 divergences:  53%|#####3    | 799/1500 [00:04&lt;00:02, 307.76it/s]
+Sampling chain 0, 51 divergences:  53%|#####3    | 799/1500 [00:04&lt;00:02, 307.76it/s]
+Sampling chain 0, 52 divergences:  53%|#####3    | 799/1500 [00:04&lt;00:02, 307.76it/s]
+Sampling chain 0, 53 divergences:  53%|#####3    | 799/1500 [00:04&lt;00:02, 307.76it/s]
+Sampling chain 0, 54 divergences:  53%|#####3    | 799/1500 [00:04&lt;00:02, 307.76it/s]
+Sampling chain 0, 55 divergences:  53%|#####3    | 799/1500 [00:04&lt;00:02, 307.76it/s]
+Sampling chain 0, 56 divergences:  53%|#####3    | 799/1500 [00:04&lt;00:02, 307.76it/s]
+Sampling chain 0, 57 divergences:  53%|#####3    | 799/1500 [00:04&lt;00:02, 307.76it/s]
+Sampling chain 0, 58 divergences:  53%|#####3    | 799/1500 [00:04&lt;00:02, 307.76it/s]
+Sampling chain 0, 59 divergences:  53%|#####3    | 799/1500 [00:04&lt;00:02, 307.76it/s]
+Sampling chain 0, 60 divergences:  53%|#####3    | 799/1500 [00:04&lt;00:02, 307.76it/s]
+Sampling chain 0, 61 divergences:  53%|#####3    | 799/1500 [00:04&lt;00:02, 307.76it/s]
+Sampling chain 0, 62 divergences:  53%|#####3    | 799/1500 [00:04&lt;00:02, 307.76it/s]
+Sampling chain 0, 63 divergences:  53%|#####3    | 799/1500 [00:04&lt;00:02, 307.76it/s]
+Sampling chain 0, 64 divergences:  53%|#####3    | 799/1500 [00:04&lt;00:02, 307.76it/s]
+Sampling chain 0, 65 divergences:  53%|#####3    | 799/1500 [00:04&lt;00:02, 307.76it/s]
+Sampling chain 0, 65 divergences:  57%|#####6    | 852/1500 [00:04&lt;00:01, 351.95it/s]
+Sampling chain 0, 66 divergences:  57%|#####6    | 852/1500 [00:05&lt;00:01, 351.95it/s]
+Sampling chain 0, 67 divergences:  57%|#####6    | 852/1500 [00:05&lt;00:01, 351.95it/s]
+Sampling chain 0, 68 divergences:  57%|#####6    | 852/1500 [00:05&lt;00:01, 351.95it/s]
+Sampling chain 0, 69 divergences:  57%|#####6    | 852/1500 [00:05&lt;00:01, 351.95it/s]
+Sampling chain 0, 69 divergences:  59%|#####9    | 891/1500 [00:05&lt;00:01, 319.36it/s]
+Sampling chain 0, 70 divergences:  59%|#####9    | 891/1500 [00:05&lt;00:01, 319.36it/s]
+Sampling chain 0, 71 divergences:  59%|#####9    | 891/1500 [00:05&lt;00:01, 319.36it/s]
+Sampling chain 0, 72 divergences:  59%|#####9    | 891/1500 [00:05&lt;00:01, 319.36it/s]
+Sampling chain 0, 73 divergences:  59%|#####9    | 891/1500 [00:05&lt;00:01, 319.36it/s]
+Sampling chain 0, 73 divergences:  62%|######1   | 927/1500 [00:05&lt;00:01, 324.04it/s]
+Sampling chain 0, 74 divergences:  62%|######1   | 927/1500 [00:05&lt;00:01, 324.04it/s]
+Sampling chain 0, 75 divergences:  62%|######1   | 927/1500 [00:05&lt;00:01, 324.04it/s]
+Sampling chain 0, 76 divergences:  62%|######1   | 927/1500 [00:05&lt;00:01, 324.04it/s]
+Sampling chain 0, 77 divergences:  62%|######1   | 927/1500 [00:05&lt;00:01, 324.04it/s]
+Sampling chain 0, 78 divergences:  62%|######1   | 927/1500 [00:05&lt;00:01, 324.04it/s]
+Sampling chain 0, 79 divergences:  62%|######1   | 927/1500 [00:05&lt;00:01, 324.04it/s]
+Sampling chain 0, 80 divergences:  62%|######1   | 927/1500 [00:05&lt;00:01, 324.04it/s]
+Sampling chain 0, 81 divergences:  62%|######1   | 927/1500 [00:05&lt;00:01, 324.04it/s]
+Sampling chain 0, 82 divergences:  62%|######1   | 927/1500 [00:05&lt;00:01, 324.04it/s]
+Sampling chain 0, 83 divergences:  62%|######1   | 927/1500 [00:05&lt;00:01, 324.04it/s]
+Sampling chain 0, 83 divergences:  64%|######4   | 966/1500 [00:05&lt;00:01, 341.31it/s]
+Sampling chain 0, 84 divergences:  64%|######4   | 966/1500 [00:05&lt;00:01, 341.31it/s]
+Sampling chain 0, 84 divergences:  67%|######6   | 1002/1500 [00:05&lt;00:01, 303.18it/s]
+Sampling chain 0, 85 divergences:  67%|######6   | 1002/1500 [00:05&lt;00:01, 303.18it/s]
+Sampling chain 0, 86 divergences:  67%|######6   | 1002/1500 [00:05&lt;00:01, 303.18it/s]
+Sampling chain 0, 86 divergences:  69%|######9   | 1035/1500 [00:05&lt;00:01, 286.69it/s]
+Sampling chain 0, 87 divergences:  69%|######9   | 1035/1500 [00:05&lt;00:01, 286.69it/s]
+Sampling chain 0, 88 divergences:  69%|######9   | 1035/1500 [00:05&lt;00:01, 286.69it/s]
+Sampling chain 0, 89 divergences:  69%|######9   | 1035/1500 [00:05&lt;00:01, 286.69it/s]
+Sampling chain 0, 89 divergences:  71%|#######1  | 1066/1500 [00:05&lt;00:01, 278.89it/s]
+Sampling chain 0, 90 divergences:  71%|#######1  | 1066/1500 [00:05&lt;00:01, 278.89it/s]
+Sampling chain 0, 91 divergences:  71%|#######1  | 1066/1500 [00:05&lt;00:01, 278.89it/s]
+Sampling chain 0, 92 divergences:  71%|#######1  | 1066/1500 [00:05&lt;00:01, 278.89it/s]
+Sampling chain 0, 93 divergences:  71%|#######1  | 1066/1500 [00:05&lt;00:01, 278.89it/s]
+Sampling chain 0, 94 divergences:  71%|#######1  | 1066/1500 [00:05&lt;00:01, 278.89it/s]
+Sampling chain 0, 94 divergences:  73%|#######3  | 1096/1500 [00:05&lt;00:01, 261.64it/s]
+Sampling chain 0, 95 divergences:  73%|#######3  | 1096/1500 [00:05&lt;00:01, 261.64it/s]
+Sampling chain 0, 95 divergences:  75%|#######4  | 1124/1500 [00:05&lt;00:01, 266.35it/s]
+Sampling chain 0, 95 divergences:  77%|#######6  | 1152/1500 [00:06&lt;00:01, 268.97it/s]
+Sampling chain 0, 95 divergences:  79%|#######8  | 1180/1500 [00:06&lt;00:01, 265.81it/s]
+Sampling chain 0, 96 divergences:  79%|#######8  | 1180/1500 [00:06&lt;00:01, 265.81it/s]
+Sampling chain 0, 97 divergences:  79%|#######8  | 1180/1500 [00:06&lt;00:01, 265.81it/s]
+Sampling chain 0, 98 divergences:  79%|#######8  | 1180/1500 [00:06&lt;00:01, 265.81it/s]
+Sampling chain 0, 99 divergences:  79%|#######8  | 1180/1500 [00:06&lt;00:01, 265.81it/s]
+Sampling chain 0, 99 divergences:  81%|########  | 1210/1500 [00:06&lt;00:01, 269.77it/s]
+Sampling chain 0, 100 divergences:  81%|########  | 1210/1500 [00:06&lt;00:01, 269.77it/s]
+Sampling chain 0, 101 divergences:  81%|########  | 1210/1500 [00:06&lt;00:01, 269.77it/s]
+Sampling chain 0, 102 divergences:  81%|########  | 1210/1500 [00:06&lt;00:01, 269.77it/s]
+Sampling chain 0, 103 divergences:  81%|########  | 1210/1500 [00:06&lt;00:01, 269.77it/s]
+Sampling chain 0, 103 divergences:  83%|########2 | 1238/1500 [00:06&lt;00:00, 265.16it/s]
+Sampling chain 0, 104 divergences:  83%|########2 | 1238/1500 [00:06&lt;00:00, 265.16it/s]
+Sampling chain 0, 104 divergences:  84%|########4 | 1265/1500 [00:06&lt;00:00, 265.93it/s]
+Sampling chain 0, 104 divergences:  86%|########6 | 1292/1500 [00:06&lt;00:00, 251.65it/s]
+Sampling chain 0, 105 divergences:  86%|########6 | 1292/1500 [00:06&lt;00:00, 251.65it/s]
+Sampling chain 0, 106 divergences:  86%|########6 | 1292/1500 [00:06&lt;00:00, 251.65it/s]
+Sampling chain 0, 107 divergences:  86%|########6 | 1292/1500 [00:06&lt;00:00, 251.65it/s]
+Sampling chain 0, 107 divergences:  88%|########7 | 1319/1500 [00:06&lt;00:00, 256.64it/s]
+Sampling chain 0, 108 divergences:  88%|########7 | 1319/1500 [00:06&lt;00:00, 256.64it/s]
+Sampling chain 0, 108 divergences:  90%|########9 | 1345/1500 [00:06&lt;00:00, 247.58it/s]
+Sampling chain 0, 109 divergences:  90%|########9 | 1345/1500 [00:06&lt;00:00, 247.58it/s]
+Sampling chain 0, 110 divergences:  90%|########9 | 1345/1500 [00:06&lt;00:00, 247.58it/s]
+Sampling chain 0, 111 divergences:  90%|########9 | 1345/1500 [00:06&lt;00:00, 247.58it/s]
+Sampling chain 0, 112 divergences:  90%|########9 | 1345/1500 [00:06&lt;00:00, 247.58it/s]
+Sampling chain 0, 113 divergences:  90%|########9 | 1345/1500 [00:06&lt;00:00, 247.58it/s]
+Sampling chain 0, 114 divergences:  90%|########9 | 1345/1500 [00:06&lt;00:00, 247.58it/s]
+Sampling chain 0, 115 divergences:  90%|########9 | 1345/1500 [00:06&lt;00:00, 247.58it/s]
+Sampling chain 0, 116 divergences:  90%|########9 | 1345/1500 [00:06&lt;00:00, 247.58it/s]
+Sampling chain 0, 117 divergences:  90%|########9 | 1345/1500 [00:06&lt;00:00, 247.58it/s]
+Sampling chain 0, 118 divergences:  90%|########9 | 1345/1500 [00:06&lt;00:00, 247.58it/s]
+Sampling chain 0, 118 divergences:  92%|#########2| 1386/1500 [00:06&lt;00:00, 280.28it/s]
+Sampling chain 0, 119 divergences:  92%|#########2| 1386/1500 [00:06&lt;00:00, 280.28it/s]
+Sampling chain 0, 120 divergences:  92%|#########2| 1386/1500 [00:06&lt;00:00, 280.28it/s]
+Sampling chain 0, 121 divergences:  92%|#########2| 1386/1500 [00:07&lt;00:00, 280.28it/s]
+Sampling chain 0, 122 divergences:  92%|#########2| 1386/1500 [00:07&lt;00:00, 280.28it/s]
+Sampling chain 0, 123 divergences:  92%|#########2| 1386/1500 [00:07&lt;00:00, 280.28it/s]
+Sampling chain 0, 124 divergences:  92%|#########2| 1386/1500 [00:07&lt;00:00, 280.28it/s]
+Sampling chain 0, 125 divergences:  92%|#########2| 1386/1500 [00:07&lt;00:00, 280.28it/s]
+Sampling chain 0, 125 divergences:  94%|#########4| 1416/1500 [00:07&lt;00:00, 271.80it/s]
+Sampling chain 0, 126 divergences:  94%|#########4| 1416/1500 [00:07&lt;00:00, 271.80it/s]
+Sampling chain 0, 127 divergences:  94%|#########4| 1416/1500 [00:07&lt;00:00, 271.80it/s]
+Sampling chain 0, 128 divergences:  94%|#########4| 1416/1500 [00:07&lt;00:00, 271.80it/s]
+Sampling chain 0, 128 divergences:  96%|#########6| 1445/1500 [00:07&lt;00:00, 276.43it/s]
+Sampling chain 0, 129 divergences:  96%|#########6| 1445/1500 [00:07&lt;00:00, 276.43it/s]
+Sampling chain 0, 130 divergences:  96%|#########6| 1445/1500 [00:07&lt;00:00, 276.43it/s]
+Sampling chain 0, 131 divergences:  96%|#########6| 1445/1500 [00:07&lt;00:00, 276.43it/s]
+Sampling chain 0, 132 divergences:  96%|#########6| 1445/1500 [00:07&lt;00:00, 276.43it/s]
+Sampling chain 0, 133 divergences:  96%|#########6| 1445/1500 [00:07&lt;00:00, 276.43it/s]
+Sampling chain 0, 133 divergences:  98%|#########8| 1474/1500 [00:07&lt;00:00, 262.49it/s]
+Sampling chain 0, 134 divergences:  98%|#########8| 1474/1500 [00:07&lt;00:00, 262.49it/s]
+Sampling chain 0, 135 divergences:  98%|#########8| 1474/1500 [00:07&lt;00:00, 262.49it/s]
+Sampling chain 0, 136 divergences:  98%|#########8| 1474/1500 [00:07&lt;00:00, 262.49it/s]
+Sampling chain 0, 136 divergences: 100%|##########| 1500/1500 [00:07&lt;00:00, 203.10it/s]
+
+Sampling chain 1, 0 divergences:   0%|          | 0/1500 [00:00&lt;?, ?it/s]
+Sampling chain 1, 0 divergences:   2%|1         | 26/1500 [00:00&lt;00:05, 256.50it/s]
+Sampling chain 1, 0 divergences:   3%|2         | 44/1500 [00:00&lt;00:06, 227.32it/s]
+Sampling chain 1, 0 divergences:   5%|4         | 68/1500 [00:00&lt;00:06, 226.82it/s]
+Sampling chain 1, 0 divergences:   6%|6         | 91/1500 [00:00&lt;00:06, 227.71it/s]
+Sampling chain 1, 0 divergences:   7%|7         | 112/1500 [00:00&lt;00:06, 216.97it/s]
+Sampling chain 1, 0 divergences:   9%|9         | 138/1500 [00:00&lt;00:06, 225.45it/s]
+Sampling chain 1, 0 divergences:  11%|#         | 159/1500 [00:00&lt;00:06, 219.50it/s]
+Sampling chain 1, 0 divergences:  13%|#2        | 191/1500 [00:00&lt;00:05, 241.62it/s]
+Sampling chain 1, 0 divergences:  14%|#4        | 215/1500 [00:01&lt;00:06, 192.26it/s]
+Sampling chain 1, 0 divergences:  16%|#5        | 236/1500 [00:01&lt;00:06, 194.66it/s]
+Sampling chain 1, 0 divergences:  17%|#7        | 262/1500 [00:01&lt;00:05, 207.90it/s]
+Sampling chain 1, 0 divergences:  19%|#9        | 288/1500 [00:01&lt;00:05, 220.32it/s]
+Sampling chain 1, 0 divergences:  21%|##1       | 321/1500 [00:01&lt;00:04, 244.28it/s]
+Sampling chain 1, 0 divergences:  24%|##3       | 354/1500 [00:01&lt;00:04, 264.17it/s]
+Sampling chain 1, 0 divergences:  25%|##5       | 382/1500 [00:01&lt;00:04, 258.49it/s]
+Sampling chain 1, 0 divergences:  27%|##7       | 409/1500 [00:01&lt;00:04, 221.60it/s]
+Sampling chain 1, 0 divergences:  29%|##9       | 437/1500 [00:01&lt;00:04, 235.91it/s]
+Sampling chain 1, 0 divergences:  31%|###       | 462/1500 [00:02&lt;00:04, 235.61it/s]
+Sampling chain 1, 0 divergences:  33%|###2      | 492/1500 [00:02&lt;00:04, 250.95it/s]
+Sampling chain 1, 1 divergences:  33%|###2      | 492/1500 [00:02&lt;00:04, 250.95it/s]
+Sampling chain 1, 1 divergences:  35%|###4      | 522/1500 [00:02&lt;00:03, 262.25it/s]
+Sampling chain 1, 2 divergences:  35%|###4      | 522/1500 [00:02&lt;00:03, 262.25it/s]
+Sampling chain 1, 2 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 3 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 4 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 5 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 6 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 7 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 8 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 9 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 10 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 11 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 12 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 13 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 14 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 15 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 16 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 17 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 18 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 19 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 20 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 21 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 22 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 23 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 24 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 25 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 26 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 27 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 28 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 29 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 30 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 31 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 32 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 33 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 34 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 35 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 36 divergences:  37%|###6      | 550/1500 [00:02&lt;00:03, 265.64it/s]
+Sampling chain 1, 36 divergences:  41%|####1     | 621/1500 [00:02&lt;00:02, 326.61it/s]
+Sampling chain 1, 37 divergences:  41%|####1     | 621/1500 [00:02&lt;00:02, 326.61it/s]
+Sampling chain 1, 38 divergences:  41%|####1     | 621/1500 [00:02&lt;00:02, 326.61it/s]
+Sampling chain 1, 39 divergences:  41%|####1     | 621/1500 [00:02&lt;00:02, 326.61it/s]
+Sampling chain 1, 40 divergences:  41%|####1     | 621/1500 [00:02&lt;00:02, 326.61it/s]
+Sampling chain 1, 40 divergences:  44%|####4     | 662/1500 [00:02&lt;00:02, 307.64it/s]
+Sampling chain 1, 41 divergences:  44%|####4     | 662/1500 [00:02&lt;00:02, 307.64it/s]
+Sampling chain 1, 42 divergences:  44%|####4     | 662/1500 [00:02&lt;00:02, 307.64it/s]
+Sampling chain 1, 42 divergences:  47%|####6     | 699/1500 [00:02&lt;00:02, 290.63it/s]
+Sampling chain 1, 43 divergences:  47%|####6     | 699/1500 [00:02&lt;00:02, 290.63it/s]
+Sampling chain 1, 44 divergences:  47%|####6     | 699/1500 [00:02&lt;00:02, 290.63it/s]
+Sampling chain 1, 45 divergences:  47%|####6     | 699/1500 [00:02&lt;00:02, 290.63it/s]
+Sampling chain 1, 46 divergences:  47%|####6     | 699/1500 [00:02&lt;00:02, 290.63it/s]
+Sampling chain 1, 46 divergences:  49%|####8     | 733/1500 [00:02&lt;00:02, 286.97it/s]
+Sampling chain 1, 47 divergences:  49%|####8     | 733/1500 [00:02&lt;00:02, 286.97it/s]
+Sampling chain 1, 47 divergences:  51%|#####1    | 765/1500 [00:02&lt;00:02, 286.25it/s]
+Sampling chain 1, 48 divergences:  51%|#####1    | 765/1500 [00:03&lt;00:02, 286.25it/s]
+Sampling chain 1, 49 divergences:  51%|#####1    | 765/1500 [00:03&lt;00:02, 286.25it/s]
+Sampling chain 1, 49 divergences:  53%|#####3    | 796/1500 [00:03&lt;00:02, 284.62it/s]
+Sampling chain 1, 50 divergences:  53%|#####3    | 796/1500 [00:03&lt;00:02, 284.62it/s]
+Sampling chain 1, 50 divergences:  55%|#####5    | 830/1500 [00:03&lt;00:02, 297.92it/s]
+Sampling chain 1, 51 divergences:  55%|#####5    | 830/1500 [00:03&lt;00:02, 297.92it/s]
+Sampling chain 1, 52 divergences:  55%|#####5    | 830/1500 [00:03&lt;00:02, 297.92it/s]
+Sampling chain 1, 53 divergences:  55%|#####5    | 830/1500 [00:03&lt;00:02, 297.92it/s]
+Sampling chain 1, 54 divergences:  55%|#####5    | 830/1500 [00:03&lt;00:02, 297.92it/s]
+Sampling chain 1, 55 divergences:  55%|#####5    | 830/1500 [00:03&lt;00:02, 297.92it/s]
+Sampling chain 1, 56 divergences:  55%|#####5    | 830/1500 [00:03&lt;00:02, 297.92it/s]
+Sampling chain 1, 56 divergences:  58%|#####7    | 863/1500 [00:03&lt;00:02, 304.81it/s]
+Sampling chain 1, 57 divergences:  58%|#####7    | 863/1500 [00:03&lt;00:02, 304.81it/s]
+Sampling chain 1, 58 divergences:  58%|#####7    | 863/1500 [00:03&lt;00:02, 304.81it/s]
+Sampling chain 1, 59 divergences:  58%|#####7    | 863/1500 [00:03&lt;00:02, 304.81it/s]
+Sampling chain 1, 59 divergences:  60%|#####9    | 895/1500 [00:03&lt;00:02, 290.00it/s]
+Sampling chain 1, 60 divergences:  60%|#####9    | 895/1500 [00:03&lt;00:02, 290.00it/s]
+Sampling chain 1, 61 divergences:  60%|#####9    | 895/1500 [00:03&lt;00:02, 290.00it/s]
+Sampling chain 1, 62 divergences:  60%|#####9    | 895/1500 [00:03&lt;00:02, 290.00it/s]
+Sampling chain 1, 63 divergences:  60%|#####9    | 895/1500 [00:03&lt;00:02, 290.00it/s]
+Sampling chain 1, 64 divergences:  60%|#####9    | 895/1500 [00:03&lt;00:02, 290.00it/s]
+Sampling chain 1, 65 divergences:  60%|#####9    | 895/1500 [00:03&lt;00:02, 290.00it/s]
+Sampling chain 1, 66 divergences:  60%|#####9    | 895/1500 [00:03&lt;00:02, 290.00it/s]
+Sampling chain 1, 66 divergences:  62%|######1   | 929/1500 [00:03&lt;00:01, 301.73it/s]
+Sampling chain 1, 67 divergences:  62%|######1   | 929/1500 [00:03&lt;00:01, 301.73it/s]
+Sampling chain 1, 68 divergences:  62%|######1   | 929/1500 [00:03&lt;00:01, 301.73it/s]
+Sampling chain 1, 68 divergences:  64%|######4   | 960/1500 [00:03&lt;00:01, 279.17it/s]
+Sampling chain 1, 69 divergences:  64%|######4   | 960/1500 [00:03&lt;00:01, 279.17it/s]
+Sampling chain 1, 70 divergences:  64%|######4   | 960/1500 [00:03&lt;00:01, 279.17it/s]
+Sampling chain 1, 70 divergences:  66%|######5   | 989/1500 [00:03&lt;00:01, 274.29it/s]
+Sampling chain 1, 71 divergences:  66%|######5   | 989/1500 [00:03&lt;00:01, 274.29it/s]
+Sampling chain 1, 72 divergences:  66%|######5   | 989/1500 [00:03&lt;00:01, 274.29it/s]
+Sampling chain 1, 73 divergences:  66%|######5   | 989/1500 [00:03&lt;00:01, 274.29it/s]
+Sampling chain 1, 74 divergences:  66%|######5   | 989/1500 [00:03&lt;00:01, 274.29it/s]
+Sampling chain 1, 74 divergences:  68%|######7   | 1017/1500 [00:03&lt;00:01, 274.16it/s]
+Sampling chain 1, 75 divergences:  68%|######7   | 1017/1500 [00:03&lt;00:01, 274.16it/s]
+Sampling chain 1, 76 divergences:  68%|######7   | 1017/1500 [00:03&lt;00:01, 274.16it/s]
+Sampling chain 1, 76 divergences:  70%|######9   | 1045/1500 [00:03&lt;00:01, 273.00it/s]
+Sampling chain 1, 77 divergences:  70%|######9   | 1045/1500 [00:03&lt;00:01, 273.00it/s]
+Sampling chain 1, 78 divergences:  70%|######9   | 1045/1500 [00:03&lt;00:01, 273.00it/s]
+Sampling chain 1, 79 divergences:  70%|######9   | 1045/1500 [00:03&lt;00:01, 273.00it/s]
+Sampling chain 1, 80 divergences:  70%|######9   | 1045/1500 [00:03&lt;00:01, 273.00it/s]
+Sampling chain 1, 81 divergences:  70%|######9   | 1045/1500 [00:04&lt;00:01, 273.00it/s]
+Sampling chain 1, 82 divergences:  70%|######9   | 1045/1500 [00:04&lt;00:01, 273.00it/s]
+Sampling chain 1, 82 divergences:  72%|#######1  | 1073/1500 [00:04&lt;00:01, 266.11it/s]
+Sampling chain 1, 83 divergences:  72%|#######1  | 1073/1500 [00:04&lt;00:01, 266.11it/s]
+Sampling chain 1, 83 divergences:  73%|#######3  | 1102/1500 [00:04&lt;00:01, 272.00it/s]
+Sampling chain 1, 84 divergences:  73%|#######3  | 1102/1500 [00:04&lt;00:01, 272.00it/s]
+Sampling chain 1, 85 divergences:  73%|#######3  | 1102/1500 [00:04&lt;00:01, 272.00it/s]
+Sampling chain 1, 86 divergences:  73%|#######3  | 1102/1500 [00:04&lt;00:01, 272.00it/s]
+Sampling chain 1, 86 divergences:  75%|#######5  | 1130/1500 [00:04&lt;00:01, 269.11it/s]
+Sampling chain 1, 87 divergences:  75%|#######5  | 1130/1500 [00:04&lt;00:01, 269.11it/s]
+Sampling chain 1, 88 divergences:  75%|#######5  | 1130/1500 [00:04&lt;00:01, 269.11it/s]
+Sampling chain 1, 89 divergences:  75%|#######5  | 1130/1500 [00:04&lt;00:01, 269.11it/s]
+Sampling chain 1, 89 divergences:  77%|#######7  | 1160/1500 [00:04&lt;00:01, 276.71it/s]
+Sampling chain 1, 90 divergences:  77%|#######7  | 1160/1500 [00:04&lt;00:01, 276.71it/s]
+Sampling chain 1, 91 divergences:  77%|#######7  | 1160/1500 [00:04&lt;00:01, 276.71it/s]
+Sampling chain 1, 92 divergences:  77%|#######7  | 1160/1500 [00:04&lt;00:01, 276.71it/s]
+Sampling chain 1, 93 divergences:  77%|#######7  | 1160/1500 [00:04&lt;00:01, 276.71it/s]
+Sampling chain 1, 94 divergences:  77%|#######7  | 1160/1500 [00:04&lt;00:01, 276.71it/s]
+Sampling chain 1, 95 divergences:  77%|#######7  | 1160/1500 [00:04&lt;00:01, 276.71it/s]
+Sampling chain 1, 96 divergences:  77%|#######7  | 1160/1500 [00:04&lt;00:01, 276.71it/s]
+Sampling chain 1, 97 divergences:  77%|#######7  | 1160/1500 [00:04&lt;00:01, 276.71it/s]
+Sampling chain 1, 97 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 98 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 99 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 100 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 101 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 102 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 103 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 104 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 105 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 106 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 107 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 108 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 109 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 110 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 111 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 112 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 113 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 114 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 115 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 116 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 117 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 118 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 119 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 120 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 121 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 122 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 123 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 124 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 125 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 126 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 127 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 128 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 129 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 130 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 131 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 132 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 133 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 134 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 135 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 136 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 137 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 138 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 139 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 140 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 141 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 142 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 143 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 144 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 145 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 146 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 147 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 148 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 149 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 150 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 151 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 152 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 153 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 154 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 155 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 156 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 157 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 158 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 159 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 160 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 161 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 162 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 163 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 164 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 165 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 166 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 167 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 168 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 169 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 170 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 171 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 172 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 173 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 174 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 175 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 176 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 177 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 178 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 179 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 180 divergences:  80%|#######9  | 1198/1500 [00:04&lt;00:01, 300.49it/s]
+Sampling chain 1, 180 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 181 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 182 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 183 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 184 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 185 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 186 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 187 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 188 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 189 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 190 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 191 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 192 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 193 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 194 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 195 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 196 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 197 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 198 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 199 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 200 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 201 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 202 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 203 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 204 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 205 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 206 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 207 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 208 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 209 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 210 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 211 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 212 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 213 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 214 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 215 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 216 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 217 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 218 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 219 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 220 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 221 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 222 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 223 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 224 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 225 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 226 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 227 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 228 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 229 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 230 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 231 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 232 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 233 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 234 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 235 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 236 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 237 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 238 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 239 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 240 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 241 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 242 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 243 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 244 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 245 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 246 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 247 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 248 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 249 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 250 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 251 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 252 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 253 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 254 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 255 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 256 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 257 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 258 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 259 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 260 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 261 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 262 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 263 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 264 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 265 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 266 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 267 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 268 divergences:  86%|########6 | 1292/1500 [00:04&lt;00:00, 377.51it/s]
+Sampling chain 1, 268 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 269 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 270 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 271 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 272 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 273 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 274 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 275 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 276 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 277 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 278 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 279 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 280 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 281 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 282 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 283 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 284 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 285 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 286 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 287 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 288 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 289 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 290 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 291 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 292 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 293 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 294 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 295 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 296 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 297 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 298 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 299 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 300 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 301 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 302 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 303 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 304 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 305 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 306 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 307 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 308 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 309 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 310 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 311 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 312 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 313 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 314 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 315 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 316 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 317 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 318 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 319 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 320 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 321 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 322 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 323 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 324 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 325 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 326 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 327 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 328 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 329 divergences:  93%|#########2| 1393/1500 [00:04&lt;00:00, 464.73it/s]
+Sampling chain 1, 329 divergences:  99%|#########9| 1492/1500 [00:04&lt;00:00, 552.65it/s]
+Sampling chain 1, 330 divergences:  99%|#########9| 1492/1500 [00:04&lt;00:00, 552.65it/s]
+Sampling chain 1, 331 divergences:  99%|#########9| 1492/1500 [00:04&lt;00:00, 552.65it/s]
+Sampling chain 1, 332 divergences:  99%|#########9| 1492/1500 [00:04&lt;00:00, 552.65it/s]
+Sampling chain 1, 333 divergences:  99%|#########9| 1492/1500 [00:04&lt;00:00, 552.65it/s]
+Sampling chain 1, 334 divergences:  99%|#########9| 1492/1500 [00:04&lt;00:00, 552.65it/s]
+Sampling chain 1, 335 divergences:  99%|#########9| 1492/1500 [00:04&lt;00:00, 552.65it/s]
+Sampling chain 1, 336 divergences:  99%|#########9| 1492/1500 [00:04&lt;00:00, 552.65it/s]
+Sampling chain 1, 336 divergences: 100%|##########| 1500/1500 [00:04&lt;00:00, 315.28it/s]
+
+  0%|          | 0/3000 [00:00&lt;?, ?it/s]
+  1%|1         | 36/3000 [00:00&lt;00:08, 355.34it/s]
+  3%|2         | 84/3000 [00:00&lt;00:07, 383.88it/s]
+  4%|4         | 132/3000 [00:00&lt;00:07, 406.42it/s]
+  6%|6         | 180/3000 [00:00&lt;00:06, 424.67it/s]
+  8%|7         | 228/3000 [00:00&lt;00:06, 439.23it/s]
+  9%|9         | 276/3000 [00:00&lt;00:06, 450.48it/s]
+ 11%|#         | 325/3000 [00:00&lt;00:05, 459.04it/s]
+ 12%|#2        | 373/3000 [00:00&lt;00:05, 464.25it/s]
+ 14%|#4        | 421/3000 [00:00&lt;00:05, 468.19it/s]
+ 16%|#5        | 469/3000 [00:01&lt;00:05, 471.31it/s]
+ 17%|#7        | 517/3000 [00:01&lt;00:05, 473.24it/s]
+ 19%|#8        | 565/3000 [00:01&lt;00:05, 472.67it/s]
+ 20%|##        | 612/3000 [00:01&lt;00:05, 470.00it/s]
+ 22%|##2       | 660/3000 [00:01&lt;00:04, 471.61it/s]
+ 24%|##3       | 708/3000 [00:01&lt;00:04, 474.01it/s]
+ 25%|##5       | 756/3000 [00:01&lt;00:04, 475.06it/s]
+ 27%|##6       | 804/3000 [00:01&lt;00:04, 473.77it/s]
+ 28%|##8       | 852/3000 [00:01&lt;00:04, 473.87it/s]
+ 30%|###       | 900/3000 [00:01&lt;00:04, 472.50it/s]
+ 32%|###1      | 948/3000 [00:02&lt;00:04, 472.63it/s]
+ 33%|###3      | 996/3000 [00:02&lt;00:04, 473.88it/s]
+ 35%|###4      | 1044/3000 [00:02&lt;00:04, 471.96it/s]
+ 36%|###6      | 1092/3000 [00:02&lt;00:04, 472.76it/s]
+ 38%|###8      | 1140/3000 [00:02&lt;00:03, 474.43it/s]
+ 40%|###9      | 1188/3000 [00:02&lt;00:03, 475.68it/s]
+ 41%|####1     | 1236/3000 [00:02&lt;00:03, 475.37it/s]
+ 43%|####2     | 1284/3000 [00:02&lt;00:03, 475.87it/s]
+ 44%|####4     | 1333/3000 [00:02&lt;00:03, 477.23it/s]
+ 46%|####6     | 1381/3000 [00:02&lt;00:03, 476.88it/s]
+ 48%|####7     | 1430/3000 [00:03&lt;00:03, 478.04it/s]
+ 49%|####9     | 1478/3000 [00:03&lt;00:03, 477.49it/s]
+ 51%|#####     | 1526/3000 [00:03&lt;00:03, 473.50it/s]
+ 52%|#####2    | 1574/3000 [00:03&lt;00:03, 470.31it/s]
+ 54%|#####4    | 1622/3000 [00:03&lt;00:02, 472.37it/s]
+ 56%|#####5    | 1671/3000 [00:03&lt;00:02, 474.63it/s]
+ 57%|#####7    | 1719/3000 [00:03&lt;00:02, 469.96it/s]
+ 59%|#####8    | 1767/3000 [00:03&lt;00:02, 467.03it/s]
+ 60%|######    | 1814/3000 [00:03&lt;00:02, 467.47it/s]
+ 62%|######2   | 1861/3000 [00:03&lt;00:02, 463.29it/s]
+ 64%|######3   | 1908/3000 [00:04&lt;00:02, 461.71it/s]
+ 65%|######5   | 1955/3000 [00:04&lt;00:02, 461.55it/s]
+ 67%|######6   | 2002/3000 [00:04&lt;00:02, 457.74it/s]
+ 68%|######8   | 2048/3000 [00:04&lt;00:02, 454.10it/s]
+ 70%|######9   | 2096/3000 [00:04&lt;00:01, 459.19it/s]
+ 71%|#######1  | 2144/3000 [00:04&lt;00:01, 464.13it/s]
+ 73%|#######3  | 2192/3000 [00:04&lt;00:01, 467.91it/s]
+ 75%|#######4  | 2239/3000 [00:04&lt;00:01, 467.30it/s]
+ 76%|#######6  | 2287/3000 [00:04&lt;00:01, 470.33it/s]
+ 78%|#######7  | 2335/3000 [00:04&lt;00:01, 471.16it/s]
+ 79%|#######9  | 2383/3000 [00:05&lt;00:01, 473.19it/s]
+ 81%|########1 | 2431/3000 [00:05&lt;00:01, 472.10it/s]
+ 83%|########2 | 2479/3000 [00:05&lt;00:01, 469.97it/s]
+ 84%|########4 | 2527/3000 [00:05&lt;00:01, 470.51it/s]
+ 86%|########5 | 2575/3000 [00:05&lt;00:00, 471.79it/s]
+ 87%|########7 | 2623/3000 [00:05&lt;00:00, 470.73it/s]
+ 89%|########9 | 2671/3000 [00:05&lt;00:00, 465.91it/s]
+ 91%|######### | 2719/3000 [00:05&lt;00:00, 468.04it/s]
+ 92%|#########2| 2767/3000 [00:05&lt;00:00, 470.57it/s]
+ 94%|#########3| 2815/3000 [00:05&lt;00:00, 466.96it/s]
+ 95%|#########5| 2863/3000 [00:06&lt;00:00, 468.83it/s]
+ 97%|#########7| 2910/3000 [00:06&lt;00:00, 468.35it/s]
+ 99%|#########8| 2958/3000 [00:06&lt;00:00, 470.00it/s]
+100%|##########| 3000/3000 [00:06&lt;00:00, 469.35it/s]
+</pre></div>
+</div>
+<div class="highlight-python3 notranslate"><div class="highlight"><pre><span></span><span class="n">data</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">from_pymc3</span><span class="p">(</span><span class="n">trace</span><span class="o">=</span><span class="n">trace</span><span class="p">,</span>
+                     <a href="https://docs.python.org/3/library/stdtypes.html#dict" title="builtins.dict" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">prior</span></a><span class="o">=</span><a href="https://docs.python.org/3/library/stdtypes.html#dict" title="builtins.dict" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">prior</span></a><span class="p">,</span>
+                     <span class="n">posterior_predictive</span><span class="o">=</span><a href="https://docs.python.org/3/library/stdtypes.html#dict" title="builtins.dict" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">post</span></a><span class="p">)</span>
+<span class="n">data</span>
+</pre></div>
+</div>
+<p class="sphx-glr-script-out">Out:</p>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Inference data with groups:
+    &gt; posterior
+    &gt; posterior_predictive
+    &gt; log_likelihood
+    &gt; sample_stats
+    &gt; prior
+    &gt; prior_predictive
+    &gt; observed_data
+</pre></div>
+</div>
+<div class="highlight-python3 notranslate"><div class="highlight"><pre><span></span><span class="n">az</span><span class="o">.</span><span class="n">plot_trace</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+<a href="https://matplotlib.org/api/_as_gen/matplotlib.pyplot.show.html#matplotlib.pyplot.show" title="matplotlib.pyplot.show" class="sphx-glr-backref-module-matplotlib-pyplot sphx-glr-backref-type-py-function"><span class="n">plt</span><span class="o">.</span><span class="n">show</span></a><span class="p">()</span>
+</pre></div>
+</div>
+<img alt="$\mu_{top}$, $\mu_{top}$, $\mu_{bottom}$, $\mu_{bottom}$, $\sigma_{top}$, $\sigma_{top}$, $\sigma_{bottom}$, $\sigma_{bottom}$, $\mu_{thickness}$, $\mu_{thickness}$, $\sigma_{thickness}$, $\sigma_{thickness}$" class="sphx-glr-single-img" src="../../_images/sphx_glr_ch5_3_probability_density_transformation_002.png" />
+<p>sphinx_gallery_thumbnail_number = 3</p>
+<div class="highlight-python3 notranslate"><div class="highlight"><pre><span></span><span class="n">az</span><span class="o">.</span><span class="n">plot_density</span><span class="p">([</span><span class="n">data</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><a href="https://docs.python.org/3/library/stdtypes.html#dict" title="builtins.dict" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">prior</span></a><span class="p">],</span> <span class="n">shade</span><span class="o">=.</span><span class="mi">9</span><span class="p">,</span> <span class="n">data_labels</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;Posterior&quot;</span><span class="p">,</span> <span class="s2">&quot;Prior&quot;</span><span class="p">],</span>
+                <span class="n">var_names</span><span class="o">=</span><span class="p">[</span>
+                    <span class="s1">&#39;$</span><span class="se">\\</span><span class="s1">mu_</span><span class="si">{top}</span><span class="s1">$&#39;</span><span class="p">,</span>
+                    <span class="s1">&#39;$</span><span class="se">\\</span><span class="s1">mu_</span><span class="si">{bottom}</span><span class="s1">$&#39;</span><span class="p">,</span>
+                    <span class="s1">&#39;$</span><span class="se">\\</span><span class="s1">mu_</span><span class="si">{thickness}</span><span class="s1">$&#39;</span><span class="p">,</span>
+                    <span class="s1">&#39;$</span><span class="se">\\</span><span class="s1">sigma_</span><span class="si">{top}</span><span class="s1">$&#39;</span><span class="p">,</span>
+                    <span class="s1">&#39;$</span><span class="se">\\</span><span class="s1">sigma_</span><span class="si">{bottom}</span><span class="s1">$&#39;</span><span class="p">,</span>
+                    <span class="s1">&#39;$</span><span class="se">\\</span><span class="s1">sigma_</span><span class="si">{thickness}</span><span class="s1">$&#39;</span>
+                <span class="p">],</span>
+                <span class="n">colors</span><span class="o">=</span><span class="p">[</span><a href="https://docs.python.org/3/library/stdtypes.html#str" title="builtins.str" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">default_red</span></a><span class="p">,</span> <a href="https://docs.python.org/3/library/stdtypes.html#list" title="builtins.list" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">default_blue</span></a><span class="p">],</span> <span class="n">bw</span><span class="o">=</span><span class="mi">5</span><span class="p">);</span>
+<a href="https://matplotlib.org/api/_as_gen/matplotlib.pyplot.show.html#matplotlib.pyplot.show" title="matplotlib.pyplot.show" class="sphx-glr-backref-module-matplotlib-pyplot sphx-glr-backref-type-py-function"><span class="n">plt</span><span class="o">.</span><span class="n">show</span></a><span class="p">()</span>
+</pre></div>
+</div>
+<img alt="$\mu_{top}$, $\mu_{bottom}$, $\mu_{thickness}$, $\sigma_{top}$, $\sigma_{bottom}$, $\sigma_{thickness}$" class="sphx-glr-single-img" src="../../_images/sphx_glr_ch5_3_probability_density_transformation_003.png" />
+<div class="highlight-python3 notranslate"><div class="highlight"><pre><span></span><span class="n">p</span> <span class="o">=</span> <span class="n">pp</span><span class="o">.</span><span class="n">PlotPosterior</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+<span class="n">p</span><span class="o">.</span><span class="n">create_figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">9</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span> <span class="n">joyplot</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">marginal</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">likelihood</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">p</span><span class="o">.</span><span class="n">plot_marginal</span><span class="p">(</span><span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;$</span><span class="se">\\</span><span class="s1">mu_</span><span class="si">{top}</span><span class="s1">$&#39;</span><span class="p">,</span> <span class="s1">&#39;$</span><span class="se">\\</span><span class="s1">mu_</span><span class="si">{bottom}</span><span class="s1">$&#39;</span><span class="p">],</span>
+                <span class="n">plot_trace</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">credible_interval</span><span class="o">=.</span><span class="mi">70</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;kde&#39;</span><span class="p">,</span>
+                <span class="n">marginal_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;bw&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">}</span>
+                <span class="p">)</span>
+<a href="https://matplotlib.org/api/_as_gen/matplotlib.pyplot.show.html#matplotlib.pyplot.show" title="matplotlib.pyplot.show" class="sphx-glr-backref-module-matplotlib-pyplot sphx-glr-backref-type-py-function"><span class="n">plt</span><span class="o">.</span><span class="n">show</span></a><span class="p">()</span>
+</pre></div>
+</div>
+<img alt="ch5 3 probability density transformation" class="sphx-glr-single-img" src="../../_images/sphx_glr_ch5_3_probability_density_transformation_004.png" />
+<div class="highlight-python3 notranslate"><div class="highlight"><pre><span></span><span class="n">p</span> <span class="o">=</span> <span class="n">pp</span><span class="o">.</span><span class="n">PlotPosterior</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+<span class="n">p</span><span class="o">.</span><span class="n">create_figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">9</span><span class="p">,</span> <span class="mi">6</span><span class="p">),</span> <span class="n">joyplot</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<a href="https://docs.python.org/3/library/functions.html#int" title="builtins.int" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">iteration</span></a> <span class="o">=</span> <span class="mi">500</span>
+<span class="n">p</span><span class="o">.</span><span class="n">plot_posterior</span><span class="p">([</span><span class="s1">&#39;$</span><span class="se">\\</span><span class="s1">mu_</span><span class="si">{top}</span><span class="s1">$&#39;</span><span class="p">,</span> <span class="s1">&#39;$</span><span class="se">\\</span><span class="s1">mu_</span><span class="si">{bottom}</span><span class="s1">$&#39;</span><span class="p">],</span>
+                 <span class="p">[</span><span class="s1">&#39;$\mu_</span><span class="si">{thickness}</span><span class="s1">$&#39;</span><span class="p">,</span> <span class="s1">&#39;$\sigma_</span><span class="si">{thickness}</span><span class="s1">$&#39;</span><span class="p">],</span>
+                 <span class="s1">&#39;y_</span><span class="si">{thickness}</span><span class="s1">&#39;</span><span class="p">,</span> <a href="https://docs.python.org/3/library/functions.html#int" title="builtins.int" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">iteration</span></a><span class="p">,</span> <span class="n">marginal_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;credible_interval&quot;</span><span class="p">:</span> <span class="mf">0.94</span><span class="p">,</span>
+                                                              <span class="s1">&#39;marginal_kwargs&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;bw&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span>
+                                                              <span class="s1">&#39;joint_kwargs&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;bw&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">}})</span>
+<a href="https://matplotlib.org/api/_as_gen/matplotlib.pyplot.show.html#matplotlib.pyplot.show" title="matplotlib.pyplot.show" class="sphx-glr-backref-module-matplotlib-pyplot sphx-glr-backref-type-py-function"><span class="n">plt</span><span class="o">.</span><span class="n">show</span></a><span class="p">()</span>
+</pre></div>
+</div>
+<img alt="Likelihood" class="sphx-glr-single-img" src="../../_images/sphx_glr_ch5_3_probability_density_transformation_005.png" />
+<div class="highlight-python3 notranslate"><div class="highlight"><pre><span></span><span class="n">az</span><span class="o">.</span><span class="n">plot_pair</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">divergences</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;$</span><span class="se">\\</span><span class="s1">mu_</span><span class="si">{top}</span><span class="s1">$&#39;</span><span class="p">,</span> <span class="s1">&#39;$</span><span class="se">\\</span><span class="s1">mu_</span><span class="si">{bottom}</span><span class="s1">$&#39;</span><span class="p">])</span>
+<a href="https://matplotlib.org/api/_as_gen/matplotlib.pyplot.show.html#matplotlib.pyplot.show" title="matplotlib.pyplot.show" class="sphx-glr-backref-module-matplotlib-pyplot sphx-glr-backref-type-py-function"><span class="n">plt</span><span class="o">.</span><span class="n">show</span></a><span class="p">()</span>
+</pre></div>
+</div>
+<img alt="ch5 3 probability density transformation" class="sphx-glr-single-img" src="../../_images/sphx_glr_ch5_3_probability_density_transformation_006.png" />
+<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> ( 0 minutes  38.939 seconds)</p>
+<div class="sphx-glr-footer class sphx-glr-footer-example docutils container" id="sphx-glr-download-tutorials-ch5-probabilistic-modeling-ch5-3-probability-density-transformation-py">
+<div class="sphx-glr-download sphx-glr-download-python docutils container">
+<p><a class="reference download internal" download="" href="../../_downloads/37cf4fad7051c7308f1d6f805d502d95/ch5_3_probability_density_transformation.py"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Python</span> <span class="pre">source</span> <span class="pre">code:</span> <span class="pre">ch5_3_probability_density_transformation.py</span></code></a></p>
+</div>
+<div class="sphx-glr-download sphx-glr-download-jupyter docutils container">
+<p><a class="reference download internal" download="" href="../../_downloads/90965ead45d726f730d97de0186251e3/ch5_3_probability_density_transformation.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Jupyter</span> <span class="pre">notebook:</span> <span class="pre">ch5_3_probability_density_transformation.ipynb</span></code></a></p>
+</div>
+</div>
+<p class="sphx-glr-signature"><a class="reference external" href="https://sphinx-gallery.github.io">Gallery generated by Sphinx-Gallery</a></p>
+</div>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<p class="logo">
+  <a href="../../index.html">
+    <img class="logo" src="../../_static/./logos/gempy.png" alt="Logo"/>
+    
+    <h1 class="logo logo-name">GemPy</h1>
+    
+  </a>
+</p>
+
+
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=cgre-aachen&repo=gempy&type=star&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+    
+
+<p>
+<a class="badge" href="https://travis-ci.org/cgre-aachen/gempy">
+    <img
+        alt="https://secure.travis-ci.org/cgre-aachen/gempy.svg?branch=master"
+        src="https://secure.travis-ci.org/cgre-aachen/gempy.svg?branch=master"
+    />
+</a>
+</p>
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../index.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../projects.html">Additional projects</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Getting started</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started/index.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">GemPy Tutorials</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../index.html#chapter-1-gempy-fundamentals">Chapter 1: GemPy fundamentals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../index.html#chapter-2-gempy-geophysics">Chapter 2: GemPy Geophysics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../index.html#chapter-3-domain-kriging">Chapter 3: Domain Kriging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../index.html#chapter-4-topological-analysis">Chapter 4: Topological analysis</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../index.html#chapter-5-probabilistic-modeling">Chapter 5: Probabilistic Modeling</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../examples/index.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../integrations/index.html">Integrations</a></li>
+</ul>
+<p class="caption"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../code.html">Code</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">GemPy Tutorials</a><ul>
+      <li>Previous: <a href="ch5_2_introduction_pymc3.html" title="previous chapter">5 2 - Introduction PyMC3.</a></li>
+      <li>Next: <a href="../../examples/index.html" title="next chapter">Examples</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2017-2020, CGRE-Aachen Team.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.0.4</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../../_sources/tutorials/ch5_probabilistic_modeling/ch5_3_probability_density_transformation.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

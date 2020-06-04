@@ -1,0 +1,14 @@
+
+:orphan:
+
+.. _sphx_glr_tutorials_ch2-Geophysics_sg_execution_times:
+
+Computation times
+=================
+**01:08.989** total execution time for **tutorials_ch2-Geophysics** files:
+
++------------------------------------------------------------------------------------------------+-----------+--------+
+| :ref:`sphx_glr_tutorials_ch2-Geophysics_ch2_1_gravity.py` (``ch2_1_gravity.py``)               | 01:08.456 | 0.0 MB |
++------------------------------------------------------------------------------------------------+-----------+--------+
+| :ref:`sphx_glr_tutorials_ch2-Geophysics_ch2_2_cell_selection.py` (``ch2_2_cell_selection.py``) | 00:00.533 | 0.0 MB |
++------------------------------------------------------------------------------------------------+-----------+--------+
