@@ -17,9 +17,12 @@ install:
   - chmod +x conda.exe
   - export CONDA_ALWAYS_YES=1
   # This is where you put any extra dependencies you may have.
-  - ./conda.exe create -p $HOME/miniconda python=$TRAVIS_PYTHON_VERSION conda conda-build pytest six pytest-cov pytest-mock
+  - ./conda.exe create -p $HOME/miniconda python=$TRAVIS_PYTHON_VERSION conda conda-build pytest six pytest-cov pytest-mock ipython
   - export PATH="$HOME/miniconda/bin:$PATH"
   - hash -r
+  - conda install --yes -c conda-forge python-graphviz emg3d discretize pyvista!=0.25.0 discretize
+  - conda install gdal
+  - conda install -c anaconda libffi
   - pip install --upgrade setuptools pip
   - pip install -r requirements.txt
   - pip install sphinx-gallery
@@ -28,15 +31,9 @@ install:
   - pip install pyevtk
   - pip install arviz
   - pip install recommonmark
-  - pip install dataclasses pyvista==0.24 panel discretize
+  - pip install dataclasses panel
   - pip install welly
-  - conda install gdal
-  - conda install --yes -c conda-forge python-graphviz emg3d
-  - conda install -c anaconda libffi
-  - pip install pymc3
-  - pip install ipython
-    # Install untested, non-required code (linter fails without them)
-  - pip install ipython ipywidgets
+  - pip install ipywidgets
   - export PATH="./bin:$PATH"
 
 script:
