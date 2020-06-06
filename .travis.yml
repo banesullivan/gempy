@@ -44,7 +44,6 @@ script:
   - pytest
 
 stages:
-  - test
   - deploy
 
 jobs:
