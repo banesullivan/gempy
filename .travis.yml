@@ -31,7 +31,7 @@ install:
   - pip install dataclasses pyvista==0.24 panel discretize # emg3d
   - pip install welly
   - conda install gdal
-  - conda install --yes -c conda-forge python-graphviz
+  - conda install --yes -c conda-forge python-graphviz emg3d
   - conda install -c anaconda libffi
   - pip install pymc3
   - pip install ipython
